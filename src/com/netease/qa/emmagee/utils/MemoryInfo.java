@@ -77,11 +77,17 @@ public class MemoryInfo {
 				.getSystemService(Context.ACTIVITY_SERVICE);
 		am.getMemoryInfo(outInfo);
 		long avaliMem = outInfo.availMem;
+		Log.d(LOG_TAG, "avaliMem: " + avaliMem);
 		return avaliMem / 1024;
 	}
 
 	/**
 	 * get the memory of process with certain pid.
+	 *  VSS - Virtual Set Size 虚拟耗用内存（包含共享库占用的内存）
+		RSS - Resident Set Size 实际使用物理内存（包含共享库占用的内存）
+		PSS - Proportional Set Size 实际使用的物理内存（比例分配共享库占用的内存）
+		USS - Unique Set Size 进程独自占用的物理内存（不包含共享库占用的内存）
+		一般来说内存占用大小有如下规律：VSS >= RSS >= PSS >= USS
 	 * 
 	 * @param pid
 	 *            pid of process
@@ -100,6 +106,7 @@ public class MemoryInfo {
 		// TODO PSS
 		int memSize = memoryInfo[0].getTotalPss();
 		// int memSize = memoryInfo[0].getTotalPrivateDirty();
+		Log.d(LOG_TAG, "memSize: " + memSize);
 		return memSize;
 	}
 

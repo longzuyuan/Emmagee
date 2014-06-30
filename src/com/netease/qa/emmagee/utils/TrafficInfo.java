@@ -77,6 +77,7 @@ public class TrafficInfo {
 						"close randomAccessFile exception: " + e.getMessage());
 			}
 		}
+		
 		if (rcvTraffic == -1 || sndTraffic == -1) {
 			return -1;
 		} else

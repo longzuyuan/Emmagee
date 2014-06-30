@@ -40,6 +40,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.BatteryManager;
 import android.os.Build;
@@ -97,6 +100,7 @@ public class EmmageeService extends Service {
 	private Handler handler = new Handler();
 	private CpuInfo cpuInfo;
 	private String time;
+	private int cpuAlertValue, memAlertValue;
 	private boolean isFloating;
 	private String processName, packageName, settingTempFile, startActivity;
 	private int pid, uid;
@@ -161,7 +165,7 @@ public class EmmageeService extends Service {
 
 				temperature = String.valueOf(intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1) * 1.0 / 10);
 			}
-
+			
 		}
 
 	}
@@ -239,8 +243,15 @@ public class EmmageeService extends Service {
 			recipients = properties.getProperty("recipients");
 			receivers = recipients.split("\\s+");
 			smtp = properties.getProperty("smtp");
+			//CPU、MEM阀值读取
+			String cpuAlert = properties.getProperty("cpuAlert");
+			String memAlert = properties.getProperty("memAlert");
+			cpuAlertValue = cpuAlert == null || "".equals(cpuAlert) ? 50 : Integer.parseInt(cpuAlert.trim());
+			memAlertValue = memAlert == null || "".equals(memAlert) ? 50 : Integer.parseInt(memAlert.trim());
 		} catch (IOException e) {
 			time = "5";
+			cpuAlertValue = 50;
+			memAlertValue = 50;
 			isFloating = true;
 			Log.e(LOG_TAG, e.getMessage());
 		}
@@ -428,10 +439,13 @@ public class EmmageeService extends Service {
 	 * @throws IOException
 	 */
 	private void dataRefresh() {
+		//内存：应用内存、剩余内存
 		int pidMemory = memoryInfo.getPidMemorySize(pid, getBaseContext());
 		long freeMemory = memoryInfo.getFreeMemorySize(getBaseContext());
 		String freeMemoryKb = fomart.format((double) freeMemory / 1024);
 		String processMemory = fomart.format((double) pidMemory / 1024);
+		
+		//电量
 		String currentBatt = String.valueOf(currentInfo.getCurrentValue());
 		// 异常数据过滤
 		Log.d("my logs-before", currentBatt);
@@ -445,6 +459,8 @@ public class EmmageeService extends Service {
 			currentBatt = "N/A";
 		}
 		Log.d("my logs-after", currentBatt);
+		
+		//CPU
 		ArrayList<String> processInfo = cpuInfo.getCpuRatioInfo(totalBatt, currentBatt, temperature, voltage);
 		if (isFloating) {
 			String processCpuRatio = "0";
@@ -475,6 +491,23 @@ public class EmmageeService extends Service {
 						txtTraffic.setText(batt + ",流量:" + fomart.format(trafficMb) + "MB");
 					else
 						txtTraffic.setText(batt + ",流量:" + trafficSize + "KB");
+					
+					//CPU、MEM阀值报警
+					String alertText = "";
+					if(Float.parseFloat(processCpuRatio) > cpuAlertValue) {
+						alertText = "警告：应用CPU使用率为" + processCpuRatio + "%,大于" + cpuAlertValue + "%";
+					}
+					if(Float.parseFloat(processMemory) > memAlertValue) {
+						if(!alertText.equals("")) alertText += "\n";
+						alertText += "警告：应用占用内存为" + processMemory + "MB,大于" + memAlertValue + "MB";
+					}
+					if(!alertText.equals("")) {
+						Toast.makeText(this, alertText, Toast.LENGTH_LONG).show();
+						
+						Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+						Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
+						r.play(); 
+					}
 				}
 				// 当内存为0切cpu使用率为0时则是被测应用退出
 				if ("0".equals(processMemory) && "0.00".equals(processCpuRatio)) {
