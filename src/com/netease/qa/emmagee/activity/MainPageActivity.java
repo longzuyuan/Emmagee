@@ -30,7 +30,6 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.ResolveInfo;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -49,10 +48,10 @@ import android.widget.RadioButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.netease.qa.emmagee.R;
 import com.netease.qa.emmagee.service.EmmageeService;
 import com.netease.qa.emmagee.utils.ProcessInfo;
 import com.netease.qa.emmagee.utils.Programe;
-import com.netease.qa.emmagee.R;
 
 /**
  * Main Page of Emmagee
@@ -153,6 +152,7 @@ public class MainPageActivity extends Activity {
 		IntentFilter filter = new IntentFilter();
 		filter.addAction("com.netease.action.emmageeService");
 		this.registerReceiver(receiver, filter);
+		
 		super.onStart();
 	}
 

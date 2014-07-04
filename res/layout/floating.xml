@@ -59,13 +59,19 @@
                 <Button
                     android:id="@+id/wifi"
                     android:textSize = "12dp"
-                    android:layout_width="80dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="40dp" />
                 <Button
                     android:id="@+id/stop"
                     android:text="停止测试"
                     android:textSize = "12dp"
-                    android:layout_width="80dp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp" />
+                <Button
+                    android:id="@+id/dump"
+                    android:text="Dump"
+                    android:textSize = "12dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="40dp" />
             </LinearLayout>
         </LinearLayout>

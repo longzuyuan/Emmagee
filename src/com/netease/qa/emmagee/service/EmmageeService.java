@@ -58,6 +58,8 @@ import android.view.View.OnClickListener;
 import android.view.View.OnTouchListener;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -69,6 +71,7 @@ import com.netease.qa.emmagee.utils.EncryptData;
 import com.netease.qa.emmagee.utils.MailSender;
 import com.netease.qa.emmagee.utils.MemoryInfo;
 import com.netease.qa.emmagee.utils.MyApplication;
+import com.netease.qa.emmagee.utils.Tools;
 
 /**
  * Service running in background
@@ -93,6 +96,7 @@ public class EmmageeService extends Service {
 	private TextView txtTraffic;
 	private Button btnStop;
 	private Button btnWifi;
+	private Button btnDump;
 	private int delaytime;
 	private DecimalFormat fomart;
 	private MemoryInfo memoryInfo;
@@ -100,7 +104,7 @@ public class EmmageeService extends Service {
 	private Handler handler = new Handler();
 	private CpuInfo cpuInfo;
 	private String time;
-	private int cpuAlertValue, memAlertValue;
+	private int cpuAlertValue, memAlertValue, dumpheapValue, dumpheapValue2, curDumpHeapValue;
 	private boolean isFloating;
 	private String processName, packageName, settingTempFile, startActivity;
 	private int pid, uid;
@@ -127,6 +131,7 @@ public class EmmageeService extends Service {
 	private int getStartTimeCount = 0;
 	private boolean isGetStartTime = true;
 	private String startTime = "";
+	private long totalMemorySize;
 
 	@Override
 	public void onCreate() {
@@ -219,6 +224,14 @@ public class EmmageeService extends Service {
 					stopSelf();
 				}
 			});
+			//dump heap
+			btnDump = (Button) viFloatingWindow.findViewById(R.id.dump);
+			btnDump.setOnClickListener(new OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					runCMDAmDumpHeap();
+				}
+			});
 			createFloatingWindow();
 		}
 		createResultCsv();
@@ -243,20 +256,83 @@ public class EmmageeService extends Service {
 			recipients = properties.getProperty("recipients");
 			receivers = recipients.split("\\s+");
 			smtp = properties.getProperty("smtp");
+			
 			//CPU、MEM阀值读取
 			String cpuAlert = properties.getProperty("cpuAlert");
 			String memAlert = properties.getProperty("memAlert");
-			cpuAlertValue = cpuAlert == null || "".equals(cpuAlert) ? 50 : Integer.parseInt(cpuAlert.trim());
-			memAlertValue = memAlert == null || "".equals(memAlert) ? 50 : Integer.parseInt(memAlert.trim());
+			cpuAlertValue = (cpuAlert == null || "".equals(cpuAlert) ? 50 : Integer.parseInt(cpuAlert.trim()));
+			memAlertValue = (memAlert == null || "".equals(memAlert) ? 50 : Integer.parseInt(memAlert.trim()));
+			
+			//MEM dumpheap触发值、增长率读取
+			String dumpheap = properties.getProperty("dumpheap");
+			dumpheapValue = (dumpheap == null || "".equals(dumpheap) ? 60 : Integer.parseInt(dumpheap.trim()));
+			String dumpheap2 = properties.getProperty("dumpheap2");
+			dumpheapValue2 = (dumpheap2 == null || "".equals(dumpheap2) ? 5 : Integer.parseInt(dumpheap2.trim()));
 		} catch (IOException e) {
 			time = "5";
 			cpuAlertValue = 50;
 			memAlertValue = 50;
+			dumpheapValue = 60;
+			dumpheapValue2 = 5;
 			isFloating = true;
 			Log.e(LOG_TAG, e.getMessage());
 		}
+		curDumpHeapValue = dumpheapValue;
 	}
 
+	/**
+	 * run am dumpheap to generate hprof file
+	 */
+	private void runCMDAmDumpHeap() {
+		Calendar cal = Calendar.getInstance();
+		SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
+		String mDateTime;
+		if ((Build.MODEL.equals("sdk")) || (Build.MODEL.equals("google_sdk")))
+			mDateTime = formatter.format(cal.getTime().getTime() + 8 * 60 * 60 * 1000);
+		else
+			mDateTime = formatter.format(cal.getTime().getTime());
+
+		String dumpFilePath;
+		if (android.os.Environment.getExternalStorageState().equals(android.os.Environment.MEDIA_MOUNTED)) {
+			dumpFilePath = android.os.Environment.getExternalStorageDirectory() + File.separator + "Dump_" + packageName + "_" + mDateTime + ".hprof";
+		} else {
+			dumpFilePath = getBaseContext().getFilesDir().getPath() + File.separator + "Dump_" + packageName + "_" + mDateTime + ".hprof";
+		}
+
+		Log.d(LOG_TAG, "Dump 4" + dumpFilePath);
+		String message = "";
+		try { //执行命令am dump
+			String cmd = "am dumpheap " + packageName + " " + dumpFilePath + " \n";
+			Process proc = Runtime.getRuntime().exec("su"); //root权限
+            proc.getOutputStream().write(cmd.getBytes()); //am dump
+            proc.getOutputStream().flush();
+			proc.getOutputStream().write("exit\n".getBytes()); //退出，否则后面waitfor锁死 
+			proc.getOutputStream().flush();
+			proc.waitFor();
+			Log.d(LOG_TAG, "Dump 5");
+			
+			//判断文件有没有生成成功
+            File f = new File(dumpFilePath);
+			Log.d(LOG_TAG, "Dump 6" + f.getAbsolutePath());
+            if(f.exists()) message = "Dump成功，文件位置：" + dumpFilePath;
+            else message = "Dump失败，没有ROOT或非Debug版本！";
+			Log.d(LOG_TAG, "Dump 7" + f.exists());
+		} catch (Exception e) {
+			Log.d(LOG_TAG, "Dump Error: " + e.getMessage());
+			Log.e(LOG_TAG, "Dump Error: " + e.getMessage());
+			message = "Dump失败，命令执行失败！" + e.getMessage();
+		}
+
+		//弹出带图片的toast窗口
+		Toast toast = Toast.makeText(viFloatingWindow.getContext(), message, Toast.LENGTH_LONG);
+		toast.setGravity(Gravity.CENTER, 0, 0);
+		LinearLayout toastView = (LinearLayout) toast.getView();
+		ImageView imageCodeProject = new ImageView(getApplicationContext());
+		imageCodeProject.setImageResource(R.drawable.icon);
+		toastView.addView(imageCodeProject, 0);
+		toast.show();
+	}
+	
 	/**
 	 * write the test result to csv format report.
 	 */
@@ -280,8 +356,8 @@ public class EmmageeService extends Service {
 			out = new FileOutputStream(resultFile);
 			osw = new OutputStreamWriter(out, "UTF-8");
 			bw = new BufferedWriter(osw);
-			long totalMemorySize = memoryInfo.getTotalMemory();
-			String totalMemory = fomart.format((double) totalMemorySize / 1024);
+			totalMemorySize = memoryInfo.getTotalMemory();
+			String totalMemory = fomart.format((double) totalMemorySize / 1024).replace(",", "");
 			bw.write("指定应用的CPU内存监控情况\r\n" + "应用包名：," + packageName + "\r\n" + "应用名称: ," + processName + "\r\n" + "应用PID: ," + pid + "\r\n"
 					+ "机器内存大小(MB)：," + totalMemory + "MB\r\n" + "机器CPU型号：," + cpuInfo.getCpuName() + "\r\n" + "机器android系统版本：,"
 					+ memoryInfo.getSDKVersion() + "\r\n" + "手机型号：," + memoryInfo.getPhoneType() + "\r\n" + "UID：," + uid + "\r\n" + START_TIME);
@@ -439,13 +515,19 @@ public class EmmageeService extends Service {
 	 * @throws IOException
 	 */
 	private void dataRefresh() {
-		//内存：应用内存、剩余内存
+		//-----内存：应用内存、剩余内存、剩余比
 		int pidMemory = memoryInfo.getPidMemorySize(pid, getBaseContext());
 		long freeMemory = memoryInfo.getFreeMemorySize(getBaseContext());
 		String freeMemoryKb = fomart.format((double) freeMemory / 1024);
 		String processMemory = fomart.format((double) pidMemory / 1024);
-		
-		//电量
+
+		String processMemRatio = "";
+		if (totalMemorySize != 0) {
+			processMemRatio = fomart.format(((double) pidMemory / (double) totalMemorySize) * 100);
+		}
+		//---内存读取计算完毕----------------------
+
+		//-------电量初始
 		String currentBatt = String.valueOf(currentInfo.getCurrentValue());
 		// 异常数据过滤
 		Log.d("my logs-before", currentBatt);
@@ -459,14 +541,30 @@ public class EmmageeService extends Service {
 			currentBatt = "N/A";
 		}
 		Log.d("my logs-after", currentBatt);
+		//---电量读取计算完毕----------------------
 		
+		//-------时间
+		String mDateTime2;
+		Calendar cal = Calendar.getInstance();
+		SimpleDateFormat formatterFile = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+		if ((Build.MODEL.equals("sdk")) || (Build.MODEL.equals("google_sdk"))) {
+			mDateTime2 = formatterFile.format(cal.getTime().getTime() + 8 * 60 * 60 * 1000);
+			totalBatt = "N/A";
+			currentBatt = "N/A";
+			temperature = "N/A";
+			voltage = "N/A";
+		} else
+			mDateTime2 = formatterFile.format(cal.getTime().getTime());
+		//---时间读取完毕----------------------
+
 		//CPU
-		ArrayList<String> processInfo = cpuInfo.getCpuRatioInfo(totalBatt, currentBatt, temperature, voltage);
+		ArrayList<String> processInfo = cpuInfo.getCpuRatioInfo();
+		
 		if (isFloating) {
 			String processCpuRatio = "0";
 			String totalCpuRatio = "0";
 			String trafficSize = "0";
-			int tempTraffic = 0;
+			int trafficKb = 0;
 			double trafficMb = 0;
 			boolean isMb = false;
 			if (!processInfo.isEmpty()) {
@@ -474,14 +572,15 @@ public class EmmageeService extends Service {
 				totalCpuRatio = processInfo.get(1);
 				trafficSize = processInfo.get(2);
 				if (!("".equals(trafficSize)) && !("-1".equals(trafficSize))) {
-					tempTraffic = Integer.parseInt(trafficSize);
-					if (tempTraffic > 1024) {
+					trafficKb = Integer.parseInt(trafficSize);
+					if (trafficKb > 1024) {
 						isMb = true;
-						trafficMb = (double) tempTraffic / 1024;
+						trafficMb = (double) trafficKb / 1024;
 					}
 				}
 				// 如果cpu使用率存在且都不小于0，则输出
 				if (processCpuRatio != null && totalCpuRatio != null) {
+					//更新悬浮窗
 					txtUnusedMem.setText("应用/剩余内存:" + processMemory + "/" + freeMemoryKb + "MB");
 					txtTotalMem.setText("应用/总体CPU:" + processCpuRatio + "%/" + totalCpuRatio + "%");
 					String batt = "电流:" + currentBatt;
@@ -492,23 +591,48 @@ public class EmmageeService extends Service {
 					else
 						txtTraffic.setText(batt + ",流量:" + trafficSize + "KB");
 					
+					//更新CSV
+					if (Tools.isPositive(processCpuRatio) && Tools.isPositive(totalCpuRatio)) {
+						try {
+							// whether certain device supports traffic statics or not
+							if (trafficKb == -1) {
+								bw.write(mDateTime2 + "," + processMemory + "," + processMemRatio + "," + freeMemoryKb + "," + processCpuRatio + ","
+										+ totalCpuRatio + "," + "N/A" + "," + totalBatt + "," + currentBatt + "," + temperature + "," + voltage + "\r\n");
+							} else {
+								bw.write(mDateTime2 + "," + processMemory + "," + processMemRatio + "," + freeMemoryKb + "," + processCpuRatio + ","
+										+ totalCpuRatio + "," + trafficKb + "," + totalBatt + "," + currentBatt + "," + temperature + "," + voltage + "\r\n");
+							}
+						} catch (IOException e) {
+							Log.d(LOG_TAG, e.getMessage());
+						}
+					}
+					
 					//CPU、MEM阀值报警
 					String alertText = "";
-					if(Float.parseFloat(processCpuRatio) > cpuAlertValue) {
+					if(Double.parseDouble(processCpuRatio) >= cpuAlertValue) {
 						alertText = "警告：应用CPU使用率为" + processCpuRatio + "%,大于" + cpuAlertValue + "%";
 					}
-					if(Float.parseFloat(processMemory) > memAlertValue) {
+					if(Double.parseDouble(processMemory) >= memAlertValue) {
 						if(!alertText.equals("")) alertText += "\n";
 						alertText += "警告：应用占用内存为" + processMemory + "MB,大于" + memAlertValue + "MB";
 					}
 					if(!alertText.equals("")) {
 						Toast.makeText(this, alertText, Toast.LENGTH_LONG).show();
-						
+						//播放提示音
 						Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
 						Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
 						r.play(); 
 					}
+					//自动dump
+					double tmpRatio = Double.parseDouble(processMemRatio);
+					if(tmpRatio >= curDumpHeapValue) {
+						curDumpHeapValue += dumpheapValue2;
+						runCMDAmDumpHeap();
+					} else if(tmpRatio < dumpheapValue) {
+						curDumpHeapValue = dumpheapValue;
+					}
 				}
+				
 				// 当内存为0切cpu使用率为0时则是被测应用退出
 				if ("0".equals(processMemory) && "0.00".equals(processCpuRatio)) {
 					closeOpenedStream();

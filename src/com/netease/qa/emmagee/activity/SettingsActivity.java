@@ -52,12 +52,14 @@ public class SettingsActivity extends Activity {
 	private EditText edtTime;
 	private EditText edtCpuValue;
 	private EditText edtMemValue;
+	private EditText edtDumpheapValue;
+	private EditText edtDumpheapValue2;
 	private EditText edtRecipients;
 	private EditText edtSender;
 	private EditText edtPassword;
 	private EditText edtSmtp;
 	private String time, sender;
-	private String cpuValue, memValue; //CPU、MEM阀值
+	private String cpuValue, memValue, dumpheapValue, dumpheapValue2; //CPU、MEM阀值、MEM自动dump百分比
 	private String prePassword, curPassword;
 	private String settingTempFile;
 	private String recipients, smtp;
@@ -77,6 +79,8 @@ public class SettingsActivity extends Activity {
 		edtTime = (EditText) findViewById(R.id.time);
 		edtCpuValue = (EditText) findViewById(R.id.cpuValue);
 		edtMemValue = (EditText) findViewById(R.id.memValue);
+		edtDumpheapValue = (EditText) findViewById(R.id.dumpheapValue);
+		edtDumpheapValue2 = (EditText) findViewById(R.id.dumpheapValue2);
 		edtSender = (EditText) findViewById(R.id.sender);
 		edtPassword = (EditText) findViewById(R.id.password);
 		edtRecipients = (EditText) findViewById(R.id.recipients);
@@ -101,6 +105,11 @@ public class SettingsActivity extends Activity {
 			String memAlert = properties.getProperty("memAlert");
 			cpuValue = cpuAlert == null || "".equals(cpuAlert) ? "50" : cpuAlert.trim();
 			memValue = memAlert == null || "".equals(memAlert) ? "50" : memAlert.trim();
+			//MEM dumpheap触发值、增长率读取
+			String dumpheap = properties.getProperty("dumpheap");
+			dumpheapValue = (dumpheap == null || "".equals(dumpheap) ? "60" : dumpheap.trim());
+			String dumpheap2 = properties.getProperty("dumpheap2");
+			dumpheapValue2 = (dumpheap2 == null || "".equals(dumpheap2) ? "5" : dumpheap2.trim());
 		} catch (FileNotFoundException e) {
 			Log.e(LOG_TAG, "FileNotFoundException: " + e.getMessage());
 			e.printStackTrace();
@@ -111,6 +120,8 @@ public class SettingsActivity extends Activity {
 		edtTime.setText(time);
 		edtCpuValue.setText(cpuValue);
 		edtMemValue.setText(memValue);
+		edtDumpheapValue.setText(dumpheapValue);
+		edtDumpheapValue2.setText(dumpheapValue2);
 		chkFloat.setChecked(floatingTag);
 		edtRecipients.setText(recipients);
 		edtSender.setText(sender);
@@ -125,6 +136,8 @@ public class SettingsActivity extends Activity {
 
 				cpuValue = edtCpuValue.getText().toString().trim();
 				memValue = edtMemValue.getText().toString().trim();
+				dumpheapValue = edtDumpheapValue.getText().toString().trim();
+				dumpheapValue2 = edtDumpheapValue2.getText().toString().trim();
 				
 				sender = edtSender.getText().toString().trim();
 				if (!"".equals(sender) && !checkMailFormat(sender)) {
@@ -167,6 +180,8 @@ public class SettingsActivity extends Activity {
 						properties.setProperty("interval", time);
 						properties.setProperty("cpuAlert", cpuValue);
 						properties.setProperty("memAlert", memValue);
+						properties.setProperty("dumpheap", dumpheapValue);
+						properties.setProperty("dumpheap2", dumpheapValue2);
 						properties.setProperty("isfloat",
 								chkFloat.isChecked() ? "true" : "false");
 						properties.setProperty("sender", sender);

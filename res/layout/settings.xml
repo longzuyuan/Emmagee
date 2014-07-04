@@ -107,6 +107,48 @@
             android:text="@string/mb" />
     </LinearLayout>
     
+    <!-- dump MEM -->
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal" >
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/dumpheapMsg1" />
+
+        <EditText
+            android:id="@+id/dumpheapValue"
+            android:layout_width="60dp"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:maxLength="2" />
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/percent" />
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/dumpheapMsg2" />
+        
+        <EditText
+            android:id="@+id/dumpheapValue2"
+            android:layout_width="60dp"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:maxLength="2" />
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/percent" />
+        
+    </LinearLayout>
+    
     <LinearLayout
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"

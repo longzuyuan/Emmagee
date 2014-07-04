@@ -19,6 +19,8 @@
     <string name="memAlert">，MEM</string>
     <string name="percent">%</string>
     <string name="mb">MB</string>
+    <string name="dumpheapMsg1">内存</string>
+    <string name="dumpheapMsg2">时,自动dump,增长率</string>
     <string name="receiver">收件人(多人以空格分割)：</string>
     <string name="sender">发件人：</string>
     <string name="password">密  码：</string>

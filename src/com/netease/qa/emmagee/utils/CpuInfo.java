@@ -44,9 +44,7 @@ public class CpuInfo {
 	private long idleCpu;
 	private long totalCpu;
 	private boolean isInitialStatics = true;
-	private SimpleDateFormat formatterFile;
 	private MemoryInfo mi;
-	private long totalMemorySize;
 	private long initialTraffic;
 	private long lastestTraffic;
 	private long traffic;
@@ -63,9 +61,7 @@ public class CpuInfo {
 		this.pid = pid;
 		this.context = context;
 		trafficInfo = new TrafficInfo(uid);
-		formatterFile = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 		mi = new MemoryInfo();
-		totalMemorySize = mi.getTotalMemory();
 		cpuUsedRatio = new ArrayList<String>();
 	}
 
@@ -131,11 +127,14 @@ public class CpuInfo {
 	/**
 	 * reserve used ratio of process CPU and total CPU, meanwhile collect
 	 * network traffic.
+	 * @param pMemory 
+	 * @param processMemRatio 
+	 * @param fMemory 
 	 * 
 	 * @return network traffic ,used ratio of process CPU and total CPU in
 	 *         certain interval
 	 */
-	public ArrayList<String> getCpuRatioInfo(String totalBatt, String currentBatt, String temperature, String voltage) {
+	public ArrayList<String> getCpuRatioInfo() {
 
 		DecimalFormat fomart = new DecimalFormat();
 		// fomart.setGroupingUsed(false);
@@ -146,21 +145,14 @@ public class CpuInfo {
 		cpuUsedRatio.clear();
 
 		try {
-			String mDateTime2;
-			Calendar cal = Calendar.getInstance();
-			if ((Build.MODEL.equals("sdk")) || (Build.MODEL.equals("google_sdk"))) {
-				mDateTime2 = formatterFile.format(cal.getTime().getTime() + 8 * 60 * 60 * 1000);
-				totalBatt = "N/A";
-				currentBatt = "N/A";
-				temperature = "N/A";
-				voltage = "N/A";
-			} else
-				mDateTime2 = formatterFile.format(cal.getTime().getTime());
-
-			if (isInitialStatics) {
+			if (isInitialStatics) {//第一次执行，先初始化
 				initialTraffic = trafficInfo.getTrafficInfo();
 				isInitialStatics = false;
-			} else {
+
+				totalCpu2 = totalCpu;
+				processCpu2 = processCpu;
+				idleCpu2 = idleCpu;
+			} else { //第N（N>1）次执行，CPU减上一次计算结果，流量减第一次计算结果
 				lastestTraffic = trafficInfo.getTrafficInfo();
 				if (initialTraffic == -1)
 					traffic = -1;
@@ -170,55 +162,20 @@ public class CpuInfo {
 				processCpuRatio = fomart.format(100 * ((double) (processCpu - processCpu2) / ((double) (totalCpu - totalCpu2))));
 				totalCpuRatio = fomart.format(100 * ((double) ((totalCpu - idleCpu) - (totalCpu2 - idleCpu2)) / (double) (totalCpu - totalCpu2)));
 				
-				//内存
-				long pidMemory = mi.getPidMemorySize(pid, context);
-				String pMemory = fomart.format((double) pidMemory / 1024);
-				
-				long freeMemory = mi.getFreeMemorySize(context);
-				String fMemory = fomart.format((double) freeMemory / 1024);
-				
-				String percent = "统计出错";
-				if (totalMemorySize != 0) {
-					percent = fomart.format(((double) pidMemory / (double) totalMemorySize) * 100);
-				}
-
-				if (isPositive(processCpuRatio) && isPositive(totalCpuRatio)) {
-					// whether certain device supports traffic statics or not
-					if (traffic == -1) {
-						EmmageeService.bw.write(mDateTime2 + "," + pMemory + "," + percent + "," + fMemory + "," + processCpuRatio + ","
-								+ totalCpuRatio + "," + "N/A" + "," + totalBatt + "," + currentBatt + "," + temperature + "," + voltage + "\r\n");
-					} else {
-						EmmageeService.bw.write(mDateTime2 + "," + pMemory + "," + percent + "," + fMemory + "," + processCpuRatio + ","
-								+ totalCpuRatio + "," + traffic + "," + totalBatt + "," + currentBatt + "," + temperature + "," + voltage + "\r\n");
-					}
+				if (Tools.isPositive(processCpuRatio) && Tools.isPositive(totalCpuRatio)) {
 					totalCpu2 = totalCpu;
 					processCpu2 = processCpu;
 					idleCpu2 = idleCpu;
+					
 					cpuUsedRatio.add(processCpuRatio);
 					cpuUsedRatio.add(totalCpuRatio);
 					cpuUsedRatio.add(String.valueOf(traffic));
 				}
 			}
-		} catch (IOException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		return cpuUsedRatio;
-	}
-
-	/**
-	 * is text a positive number
-	 * 
-	 * @param text
-	 * @return
-	 */
-	private boolean isPositive(String text) {
-		Double num;
-		try {
-			num = Double.parseDouble(text);
-		} catch (NumberFormatException e) {
-			return false;
-		}
-		return num >= 0;
 	}
 
 }
